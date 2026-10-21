@@ -1,0 +1,70 @@
+# bgp-lab01 | EVPN-VXLAN multi-tenant fabric, eBGP underlay/overlay, VRF-lite fusion edge
+# containerlab 0.79.0 | cEOS 4.36.0.1F | SONiC-VS 202511 | network-multitool
+# Use ./lab.sh deploy [base|solution]  (it stages configs/active/ before deploying)
+name: bgp-lab01
+
+mgmt:
+  network: clab-bgp-lab01
+  ipv4-subnet: 172.31.101.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+    sonic-vs:
+      image: docker-sonic-vs:202511
+    linux:
+      image: wbitt/network-multitool:alpine-extra
+
+  nodes:
+    # ---------------- fabric (cEOS) ----------------
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    leaf3:  {kind: arista_ceos, startup-config: configs/active/leaf3.cfg}
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+
+    # ---------------- WAN / fusion router (SONiC-VS, FRR) ----------------
+    isp1:
+      kind: sonic-vs
+      binds:
+        - isp:/isp:ro
+
+    # ---------------- tenant hosts ----------------
+    h1:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.10.10.101/24 dev eth1", "ip route replace default via 10.10.10.1 dev eth1"]
+    h2:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.10.10.102/24 dev eth1", "ip route replace default via 10.10.10.1 dev eth1"]
+    h3:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.10.20.103/24 dev eth1", "ip route replace default via 10.10.20.1 dev eth1"]
+    h4:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.30.30.104/24 dev eth1", "ip route replace default via 10.30.30.1 dev eth1"]
+    h5:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.30.30.105/24 dev eth1", "ip route replace default via 10.30.30.1 dev eth1"]
+
+  links:
+    # spine1 Eth1-4 -> leaf1, leaf2, leaf3, bleaf1 (Eth1)
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "leaf3:eth1"]
+    - endpoints: ["spine1:eth4", "bleaf1:eth1"]
+    # spine2 Eth1-4 -> leaf1, leaf2, leaf3, bleaf1 (Eth2)
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "leaf3:eth2"]
+    - endpoints: ["spine2:eth4", "bleaf1:eth2"]
+    # border handoff: one physical link per VRF (VRF-lite). SONiC eth1=Ethernet0, eth2=Ethernet4
+    - endpoints: ["bleaf1:eth3", "isp1:eth1"]
+    - endpoints: ["bleaf1:eth4", "isp1:eth2"]
+    # hosts
+    - endpoints: ["leaf1:eth3", "h1:eth1"]
+    - endpoints: ["leaf1:eth4", "h5:eth1"]
+    - endpoints: ["leaf2:eth3", "h2:eth1"]
+    - endpoints: ["leaf3:eth3", "h3:eth1"]
+    - endpoints: ["leaf3:eth4", "h4:eth1"]

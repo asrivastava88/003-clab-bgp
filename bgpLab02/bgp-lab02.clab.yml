@@ -1,0 +1,61 @@
+# bgp-lab02 | Dual-border, dual-ISP Internet edge for a multi-tenant EVPN-VXLAN fabric
+# containerlab 0.79.0 | cEOS 4.36.0.1F | SONiC-VS 202511 | network-multitool
+# Use ./lab.sh deploy [base|solution|te]  (stages configs/active/ first)
+name: bgp-lab02
+
+mgmt:
+  network: clab-bgp-lab02
+  ipv4-subnet: 172.31.102.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+    sonic-vs:
+      image: docker-sonic-vs:202511
+    linux:
+      image: wbitt/network-multitool:alpine-extra
+
+  nodes:
+    # ---------------- customer fabric ----------------
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+    bleaf2: {kind: arista_ceos, startup-config: configs/active/bleaf2.cfg}
+    # ---------------- providers (pre-configured) ----------------
+    ispA:   {kind: arista_ceos, startup-config: configs/active/ispA.cfg}
+    ispB:   {kind: arista_ceos, startup-config: configs/active/ispB.cfg}
+    inet:
+      kind: sonic-vs
+      binds: ["inet:/inet:ro"]
+    # ---------------- hosts ----------------
+    h1: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.10.10.101/24 dev eth1", "ip route replace default via 10.10.10.1 dev eth1"]}
+    h2: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.10.20.102/24 dev eth1", "ip route replace default via 10.10.20.1 dev eth1"]}
+    h3: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.30.30.103/24 dev eth1", "ip route replace default via 10.30.30.1 dev eth1"]}
+    h4: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.30.30.104/24 dev eth1", "ip route replace default via 10.30.30.1 dev eth1"]}
+
+  links:
+    # spines: Eth1 leaf1, Eth2 leaf2, Eth3 bleaf1, Eth4 bleaf2 | leaves: Eth1 spine1, Eth2 spine2
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "bleaf1:eth1"]
+    - endpoints: ["spine1:eth4", "bleaf2:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "bleaf1:eth2"]
+    - endpoints: ["spine2:eth4", "bleaf2:eth2"]
+    # WAN: borders Eth3 -> ispA, Eth4 -> ispB (802.1Q 101=RED, 102=BLUE)
+    - endpoints: ["bleaf1:eth3", "ispA:eth1"]
+    - endpoints: ["bleaf2:eth3", "ispA:eth2"]
+    - endpoints: ["bleaf1:eth4", "ispB:eth1"]
+    - endpoints: ["bleaf2:eth4", "ispB:eth2"]
+    # upstream: ispA/ispB Eth3 -> inet (eth1=Ethernet0, eth2=Ethernet4)
+    - endpoints: ["ispA:eth3", "inet:eth1"]
+    - endpoints: ["ispB:eth3", "inet:eth2"]
+    # hosts
+    - endpoints: ["leaf1:eth3", "h1:eth1"]
+    - endpoints: ["leaf1:eth4", "h3:eth1"]
+    - endpoints: ["leaf2:eth3", "h2:eth1"]
+    - endpoints: ["leaf2:eth4", "h4:eth1"]
