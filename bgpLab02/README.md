@@ -6,6 +6,8 @@ Lab 01 built the fabric. Lab 02 is about the edge: two border leaves, two ISPs, 
 
 ## Topology
 
+![Diagram](./diagrams/bgpLab02.png)
+
 ```
                          +-------------------------+
                          |   inet      (cEOS)      |  AS 65000

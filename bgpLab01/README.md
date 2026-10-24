@@ -6,6 +6,8 @@ You build an eBGP-only Clos (no IGP), run an EVPN overlay with L2VNIs and symmet
 
 ## Topology
 
+![Diagram](./diagrams/bgpLab01.png)
+
 ```
               +-----------+                 +-----------+
               |  spine1   |                 |  spine2   |        AS 65100 (shared)
