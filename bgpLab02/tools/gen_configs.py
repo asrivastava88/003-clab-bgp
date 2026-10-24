@@ -31,6 +31,12 @@ ISPS = {"ispA": {"asn": 65010, "iid": 1, "bport": 3, "lo0": "10.255.1.1", "cust_
         "ispB": {"asn": 65020, "iid": 2, "bport": 4, "lo0": "10.255.2.1", "cust_net": "198.51.100.0/24",
                  "cust_ip": "198.51.100.1", "bh": "198.51.100.254", "inet": ("100.64.2.1/30", "100.64.2.2")}}
 INET_ASN = 65000
+# "the Internet": a plain cEOS transit router between ispA and ispB.
+# Ethernet1 -> ispA Ethernet3, Ethernet2 -> ispB Ethernet3.
+INET = {"asn": INET_ASN, "lo0": "100.64.0.1", "target": "203.0.113.10",
+        "net": "203.0.113.0/24",
+        "links": {1: ("ispA", "100.64.1.2/30", "100.64.1.1", 65010),
+                  2: ("ispB", "100.64.2.2/30", "100.64.2.1", 65020)}}
 INTERNET = ["0.0.0.0/0", "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"]
 # TE intent
 PRIMARY = {"RED": "ispA", "BLUE": "ispB"}              # egress + ingress preference per VRF
@@ -376,6 +382,31 @@ end
     return c
 
 
+def inet(name, d):
+    """Plain transit router. No VRFs, no VXLAN, no policy: it just carries
+    203.0.113.0/24 and relays each provider's prefixes to the other."""
+    c = header(name, "provider-managed")
+    for port, (peer, ip, _, _) in sorted(d["links"].items()):
+        c += (f"interface Ethernet{port}\n   description UPSTREAM_{peer}\n"
+              f"   no switchport\n   ip address {ip}\n!\n")
+    c += (f"interface Loopback0\n   description ROUTER_ID\n   ip address {d['lo0']}/32\n!\n"
+          f"interface Loopback1\n   description internet test target\n"
+          f"   ip address {d['target']}/32\n!\n"
+          f"ip routing\n!\n"
+          f"! pull {d['net']} into the table so BGP can originate it\n"
+          f"ip route {d['net']} Null0\n!\n")
+    c += f"router bgp {d['asn']}\n   router-id {d['lo0']}\n" + COMMON_BGP
+    for _, (peer, _, pip, pasn) in sorted(d["links"].items()):
+        c += (f"   neighbor {pip} remote-as {pasn}\n"
+              f"   neighbor {pip} description {peer}\n"
+              f"   neighbor {pip} send-community\n"
+              f"   neighbor {pip} maximum-routes 12000\n")
+    c += f"   network {d['net']}\n   !\n   address-family ipv4\n"
+    for _, (_, _, pip, _) in sorted(d["links"].items()):
+        c += f"      neighbor {pip} activate\n"
+    return c + "!\nend\n"
+
+
 def main():
     root = Path(__file__).resolve().parent.parent
     for mode in ("base", "solution", "te"):
@@ -387,6 +418,7 @@ def main():
             (out / f"{l}.cfg").write_text(leaf(l, d, mode))
         for i, d in ISPS.items():
             (out / f"{i}.cfg").write_text(isp(i, d))
+        (out / "inet.cfg").write_text(inet("inet", INET))
     print("rendered configs/{base,solution,te}")
 
 

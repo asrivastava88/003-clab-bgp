@@ -1,6 +1,6 @@
 # bgp-lab02 | Dual-border, dual-ISP Internet edge for a multi-tenant EVPN-VXLAN fabric
-# containerlab 0.79.0 | cEOS 4.36.0.1F | SONiC-VS 202511 | network-multitool
-# Use ./lab.sh deploy [base|solution|te]  (stages configs/active/ first)
+# containerlab 0.79.0 | cEOS 4.36.0.1F | network-multitool
+# Deploy one mode at a time:  ./lab.sh deploy te   (also: base, solution)
 name: bgp-lab02
 
 mgmt:
@@ -11,8 +11,6 @@ topology:
   kinds:
     arista_ceos:
       image: ceos:4.36.0.1F
-    sonic-vs:
-      image: docker-sonic-vs:202511
     linux:
       image: wbitt/network-multitool:alpine-extra
 
@@ -27,9 +25,7 @@ topology:
     # ---------------- providers (pre-configured) ----------------
     ispA:   {kind: arista_ceos, startup-config: configs/active/ispA.cfg}
     ispB:   {kind: arista_ceos, startup-config: configs/active/ispB.cfg}
-    inet:
-      kind: sonic-vs
-      binds: ["inet:/inet:ro"]
+    inet:   {kind: arista_ceos, startup-config: configs/active/inet.cfg}
     # ---------------- hosts ----------------
     h1: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.10.10.101/24 dev eth1", "ip route replace default via 10.10.10.1 dev eth1"]}
     h2: {kind: linux, exec: ["ip link set eth1 up", "ip addr add 10.10.20.102/24 dev eth1", "ip route replace default via 10.10.20.1 dev eth1"]}
@@ -51,7 +47,7 @@ topology:
     - endpoints: ["bleaf2:eth3", "ispA:eth2"]
     - endpoints: ["bleaf1:eth4", "ispB:eth1"]
     - endpoints: ["bleaf2:eth4", "ispB:eth2"]
-    # upstream: ispA/ispB Eth3 -> inet (eth1=Ethernet0, eth2=Ethernet4)
+    # upstream: ispA/ispB Eth3 -> inet Eth1/Eth2
     - endpoints: ["ispA:eth3", "inet:eth1"]
     - endpoints: ["ispB:eth3", "inet:eth2"]
     # hosts

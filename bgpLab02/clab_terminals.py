@@ -3,6 +3,8 @@
 plus a compound '<lab>: open all' task. Run on the containerlab host.
 
 Usage: python3 clab_terminals.py <lab-name>
+# lab name will be in the "*.clab.yml" file Eg: bgp-lab02.clab.yml
+# name: bgp-lab02
 
 Also run the script from your workspace root. Sometimes, you may have to reload the VSCode.
 

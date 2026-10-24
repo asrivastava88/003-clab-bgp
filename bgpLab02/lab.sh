@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # bgp-lab02 control script
-#   ./lab.sh deploy [base|solution|te]  stage configs, deploy, bootstrap inet
+#   ./lab.sh deploy <base|solution|te>  stage configs and deploy (one mode, e.g. deploy te)
 #   ./lab.sh destroy                    tear down
 #   ./lab.sh verify                     fabric + edge + (te) policy checks
 #   ./lab.sh break <1-7|random>         inject a ticket (te baseline)
 #   ./lab.sh reveal | restore           show / clear active ticket
 #   ./lab.sh grey on|off                100% loss ispA -> bleaf1, carrier stays up
-#   ./lab.sh cli <node>                 Cli | inet -> vtysh | h1..h4 -> sh
+#   ./lab.sh cli <node>                 Cli on any switch | h1..h4 -> sh
 #   ./lab.sh status
 set -uo pipefail
 LAB=bgp-lab02; TOPO=bgp-lab02.clab.yml; P="clab-${LAB}"
 DIR="$(cd "$(dirname "$0")" && pwd)"; cd "$DIR"
-CEOS=(spine1 spine2 leaf1 leaf2 bleaf1 bleaf2 ispA ispB)
+CEOS=(spine1 spine2 leaf1 leaf2 bleaf1 bleaf2 ispA ispB inet)
 STATE="$DIR/.active_ticket"; CLAB="sudo containerlab"
 G='\033[32m'; R='\033[31m'; Y='\033[33m'; N='\033[0m'
 pass=0; fail=0
@@ -21,7 +21,6 @@ mode() { cat "$DIR/.mode" 2>/dev/null || echo unknown; }
 
 eos()    { local n=$1; shift; docker exec "$P-$n" Cli -p 15 -c "$*"; }
 eoscfg() { local n=$1; shift; local c; c=$(printf '%s\n' configure "$@" end); docker exec "$P-$n" Cli -p 15 -c "$c" >/dev/null; }
-vty()    { docker exec "$P-inet" vtysh "$@"; }
 
 # prints "<nexthop> <aspath>" of the best path from EOS or FRR JSON on stdin
 best() { python3 -c '
@@ -46,21 +45,12 @@ wait_ceos() {
     for _ in $(seq 1 60); do docker exec "$P-$n" Cli -c "show version" >/dev/null 2>&1 && break; printf "."; sleep 5; done
   done; echo " ok"
 }
-wait_inet() {
-  printf "[*] waiting for SONiC (inet)"
-  for _ in $(seq 1 90); do
-    docker exec "$P-inet" bash -c "redis-cli -n 0 exists PORT_TABLE:Ethernet4 | grep -q 1 && vtysh -c 'show version' >/dev/null 2>&1" && { echo " ok"; return 0; }
-    printf "."; sleep 5
-  done; echo " timeout (docker logs $P-inet)"; return 1
-}
-inet_setup() { docker exec "$P-inet" bash /inet/inet-setup.sh; }
-
 deploy() {
   local m=${1:-te}
   [[ -d configs/$m ]] || { echo "mode: base|solution|te"; exit 1; }
   cp -f configs/"$m"/*.cfg configs/active/; echo "$m" > "$DIR/.mode"
   $CLAB deploy -t "$TOPO" --reconfigure || exit 1
-  wait_ceos; wait_inet && inet_setup
+  wait_ceos
   echo -e "${Y}[i] mode=$m. Allow ~90s for convergence, then ./lab.sh verify${N}"
 }
 
@@ -73,8 +63,7 @@ path_t() { # desc host dst regex-of-expected-hop
 }
 bestnh_t() { # desc node prefix expected-regex(on "nh aspath")
   local out
-  if [[ $2 == inet ]]; then out=$(vty -c "show ip bgp $3 json" 2>/dev/null | best)
-  else out=$(eos "$2" "show ip bgp $3 | json" 2>/dev/null | best); fi
+  out=$(eos "$2" "show ip bgp $3 | json" 2>/dev/null | best)
   [[ $out =~ $4 ]] && ok "$1 [$out]" || nok "$1 [${out:-no route}]"
 }
 
@@ -90,10 +79,13 @@ verify() {
   [[ $m == base ]] && { echo -e "== Result: ${G}${pass} pass${N}, ${R}${fail} fail${N} (edge not built yet)"; return; }
 
   echo "== Edge =="
-  for n in bleaf1 bleaf2; do v=$(estab $n "show ip bgp summary vrf all")
-    [[ $v -eq 4 ]] && ok "$n WAN sessions $v/4 (RED+BLUE x ispA+ispB)" || nok "$n WAN sessions $v/4"; done
-  b=$(vty -c "show bgp ipv4 unicast summary" 2>/dev/null | awk '/^100\.64\.[12]\.1/ && $10 ~ /^[0-9]+$/' | wc -l)
-  [[ $b -eq 2 ]] && ok "inet eBGP to ispA+ispB" || nok "inet eBGP $b/2"
+  # count only the 172.16.x WAN peers: "vrf all" also lists the default VRF's
+  # IPv4 underlay sessions, which are checked in the Fabric section above
+  for n in bleaf1 bleaf2; do v=$(eos $n "show ip bgp summary vrf all" | grep -c '172\.16\..*Estab')
+    [[ ${v:-0} -eq 4 ]] && ok "$n WAN sessions $v/4 (RED+BLUE x ispA+ispB)" \
+      || nok "$n WAN sessions ${v:-0}/4 (check: show ip bgp summary vrf RED | vrf BLUE)"; done
+  b=$(estab inet "show ip bgp summary")
+  [[ $b -eq 2 ]] && ok "inet eBGP to ispA+ispB $b/2" || nok "inet eBGP $b/2"
   ping_t "h1 -> 203.0.113.10 RED internet"        h1 203.0.113.10
   ping_t "h3 -> 203.0.113.10 BLUE internet"       h3 203.0.113.10
   ping_t "h2 -> 198.51.100.1 RED to ispB cust"    h2 198.51.100.1
@@ -115,9 +107,17 @@ verify() {
   [[ -f $STATE ]] && echo -e "${Y}[i] ticket active (./lab.sh reveal | restore)${N}"
 }
 
+# netem impairments are applied as a complete set: any flag you omit returns to
+# its default, so a flagless "set" is the documented way to clear them.
 grey() {
-  if [[ $1 == on ]]; then $CLAB tools netem set -n "$P-ispA" -i eth1 --loss 100 >/dev/null && echo "[*] grey failure ON: ispA->bleaf1 100% loss, link up"
-  else $CLAB tools netem reset -n "$P-ispA" -i eth1 >/dev/null 2>&1 || $CLAB tools netem set -n "$P-ispA" -i eth1 --loss 0 >/dev/null; echo "[*] grey failure OFF"; fi
+  if [[ $1 == on ]]; then
+    $CLAB tools netem set -n "$P-ispA" -i eth1 --loss 100 >/dev/null \
+      && echo "[*] grey failure ON: ispA->bleaf1 100% loss, carrier stays up"
+  else
+    $CLAB tools netem set -n "$P-ispA" -i eth1 >/dev/null
+    echo "[*] grey failure OFF"
+  fi
+  $CLAB tools netem show -n "$P-ispA" 2>/dev/null | grep -E 'eth1|Interface' || true
 }
 
 ticket() {
@@ -146,10 +146,9 @@ restore() {
     docker exec "$P-$n" Cli -p 15 -c "configure replace flash:golden.cfg" >/dev/null && echo "  $n restored ($m)"
   done
   for n in bleaf1 bleaf2; do eos $n "clear ip bgp vrf all" >/dev/null 2>&1; done
-  inet_setup >/dev/null && echo "  inet restored"
   rm -f "$STATE"; echo "[*] baseline restored. Allow ~60s, then verify."
 }
-cli() { case $1 in inet) docker exec -it "$P-inet" vtysh ;; h[0-9]) docker exec -it "$P-$1" sh ;; *) docker exec -it "$P-$1" Cli ;; esac; }
+cli() { case $1 in h[0-9]) docker exec -it "$P-$1" sh ;; *) docker exec -it "$P-$1" Cli ;; esac; }
 
 case ${1:-} in
   deploy)  deploy "${2:-te}" ;;

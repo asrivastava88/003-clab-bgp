@@ -120,7 +120,7 @@ ip prefix-list PL-RTBH seq 20 permit 10.10.10.101/32
 ```
 The /32 already exists in VRF RED on the border: it is h1's EVPN type-2 host route imported into the IP-VRF. No static trigger is needed. A classic static-to-Null0 trigger would be exported into EVPN as a type-5 and could blackhole h1 inside your own fabric.
 
-Verify: ispA and ispB `show ip bgp 10.10.10.101/32` with next hop 192.0.2.254 / 198.51.100.254 and no-export; inet has no /32; from inet `ping -I 203.0.113.10 10.10.10.101` fails, `ping -I 203.0.113.10 10.10.20.102` works. Withdraw: `no ip prefix-list PL-RTBH seq 20`.
+Verify: ispA and ispB `show ip bgp 10.10.10.101/32` with next hop 192.0.2.254 / 198.51.100.254 and no-export; inet has no /32; from inet `ping 10.10.10.101 source 203.0.113.10` fails while `ping 10.10.20.102 source 203.0.113.10` works. Withdraw: `no ip prefix-list PL-RTBH seq 20`.
 
 Order matters: seq 5 must sit before the subnet clause, because the subnet prefix-list (`le 24`) never matches a /32.
 
