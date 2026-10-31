@@ -1,0 +1,53 @@
+# bgp-lab04 | iBGP EVPN overlay with spine route reflectors, OSPF underlay, add-path
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node, no exceptions)
+#
+# One autonomous system (65000) across the whole fabric, which is what makes the
+# overlay iBGP and the spines route reflectors. Labs 01-03 were eBGP everywhere.
+#
+# Deploy one mode at a time:  ./lab.sh deploy addpath   (also: base, solution)
+name: bgp-lab04
+
+mgmt:
+  network: clab-bgp-lab04
+  ipv4-subnet: 172.31.104.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    # ---- route reflectors ----
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    # ---- RR clients: compute leaves ----
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    # ---- RR clients: border leaves, both originate a default into VRF RED ----
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+    bleaf2: {kind: arista_ceos, startup-config: configs/active/bleaf2.cfg}
+    # ---- provider ----
+    wan:    {kind: arista_ceos, startup-config: configs/active/wan.cfg}
+    # ---- endpoints ----
+    h1:     {kind: arista_ceos, startup-config: configs/active/h1.cfg}
+    h2:     {kind: arista_ceos, startup-config: configs/active/h2.cfg}
+    h3:     {kind: arista_ceos, startup-config: configs/active/h3.cfg}
+
+  links:
+    # spines: Eth1 leaf1, Eth2 leaf2, Eth3 bleaf1, Eth4 bleaf2
+    # clients: Eth1 -> spine1, Eth2 -> spine2
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "bleaf1:eth1"]
+    - endpoints: ["spine1:eth4", "bleaf2:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "bleaf1:eth2"]
+    - endpoints: ["spine2:eth4", "bleaf2:eth2"]
+    # border handoff, VRF RED
+    - endpoints: ["bleaf1:eth3", "wan:eth1"]
+    - endpoints: ["bleaf2:eth3", "wan:eth2"]
+    # endpoints
+    - endpoints: ["leaf1:eth3", "h1:eth1"]
+    - endpoints: ["leaf2:eth3", "h2:eth1"]
+    - endpoints: ["leaf2:eth4", "h3:eth1"]

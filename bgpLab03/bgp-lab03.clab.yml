@@ -1,0 +1,89 @@
+# bgp-lab03 | EVPN multihoming (ESI-LAG) vs MLAG, side by side on one fabric
+# containerlab 0.79.0 | cEOS 4.36.0.1F | wbitt/network-multitool:alpine-extra
+#
+# leaf1+leaf2 : EVPN-MH   unique ASNs, unique VTEPs, NO peer link   -> hm1 (bond0)
+# leaf3+leaf4 : MLAG      shared ASN,  shared VTEP,  peer link      -> hm2 (bond0)
+#
+# HOST PREREQ: the bonding kernel module must be loaded before deploy.
+#   sudo modprobe bonding
+# ./lab.sh deploy checks this for you.
+name: bgp-lab03
+
+mgmt:
+  network: clab-bgp-lab03
+  ipv4-subnet: 172.31.103.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+    linux:
+      image: wbitt/network-multitool:alpine-extra
+
+  nodes:
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    leaf3:  {kind: arista_ceos, startup-config: configs/active/leaf3.cfg}
+    leaf4:  {kind: arista_ceos, startup-config: configs/active/leaf4.cfg}
+
+    # ---- dual-homed host behind the ESI-LAG (leaf1 + leaf2) ----
+    hm1:
+      kind: linux
+      exec:
+        - ip link add bond0 type bond mode 802.3ad miimon 100 lacp_rate fast xmit_hash_policy layer3+4
+        - ip link set eth1 down
+        - ip link set eth2 down
+        - ip link set eth1 master bond0
+        - ip link set eth2 master bond0
+        - ip link set bond0 up
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip addr add 10.10.10.101/24 dev bond0
+        - ip route replace default via 10.10.10.1 dev bond0
+
+    # ---- dual-homed host behind the MLAG pair (leaf3 + leaf4) ----
+    hm2:
+      kind: linux
+      exec:
+        - ip link add bond0 type bond mode 802.3ad miimon 100 lacp_rate fast xmit_hash_policy layer3+4
+        - ip link set eth1 down
+        - ip link set eth2 down
+        - ip link set eth1 master bond0
+        - ip link set eth2 master bond0
+        - ip link set bond0 up
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip addr add 10.10.10.102/24 dev bond0
+        - ip route replace default via 10.10.10.1 dev bond0
+
+    # ---- single-homed reference hosts (orphan ports) ----
+    hs1:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.10.10.103/24 dev eth1", "ip route replace default via 10.10.10.1 dev eth1"]
+    hs2:
+      kind: linux
+      exec: ["ip link set eth1 up", "ip addr add 10.10.20.104/24 dev eth1", "ip route replace default via 10.10.20.1 dev eth1"]
+
+  links:
+    # fabric: every leaf eth1 -> spine1, eth2 -> spine2
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "leaf3:eth1"]
+    - endpoints: ["spine1:eth4", "leaf4:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "leaf3:eth2"]
+    - endpoints: ["spine2:eth4", "leaf4:eth2"]
+    # ESI-LAG to hm1
+    - endpoints: ["leaf1:eth3", "hm1:eth1"]
+    - endpoints: ["leaf2:eth3", "hm1:eth2"]
+    # MLAG to hm2
+    - endpoints: ["leaf3:eth3", "hm2:eth1"]
+    - endpoints: ["leaf4:eth3", "hm2:eth2"]
+    # MLAG peer link
+    - endpoints: ["leaf3:eth5", "leaf4:eth5"]
+    # orphan ports
+    - endpoints: ["leaf1:eth4", "hs1:eth1"]
+    - endpoints: ["leaf3:eth4", "hs2:eth1"]
