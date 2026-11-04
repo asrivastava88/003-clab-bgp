@@ -1,0 +1,51 @@
+# bgp-lab08 | Multi-site EVPN DCI: two domains stitched by a pair of gateways
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+#   Site A: spineA 65100, leafA 65101, bgwA 65104    underlay 10.1.1.x
+#   Site B: spineB 65200, leafB 65201, bgwB 65204    underlay 10.2.1.x
+#   DCI:    bgwA <-> bgwB, 172.16.0.0/30
+#
+# VLAN 10 is stretched across both sites. VLAN 20 (site A) and VLAN 30
+# (site B) are site-local and reach each other by L3 only.
+#
+# Deploy one mode at a time:  ./lab.sh deploy solution   (also: base)
+name: bgp-lab08
+
+mgmt:
+  network: clab-bgp-lab08
+  ipv4-subnet: 172.31.108.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    # ---- site A ----
+    spineA: {kind: arista_ceos, startup-config: configs/active/spineA.cfg}
+    leafA:  {kind: arista_ceos, startup-config: configs/active/leafA.cfg}
+    bgwA:   {kind: arista_ceos, startup-config: configs/active/bgwA.cfg}
+    # ---- site B ----
+    spineB: {kind: arista_ceos, startup-config: configs/active/spineB.cfg}
+    leafB:  {kind: arista_ceos, startup-config: configs/active/leafB.cfg}
+    bgwB:   {kind: arista_ceos, startup-config: configs/active/bgwB.cfg}
+    # ---- hosts ----
+    hA1:    {kind: arista_ceos, startup-config: configs/active/hA1.cfg}   # vlan 10, stretched
+    hA2:    {kind: arista_ceos, startup-config: configs/active/hA2.cfg}   # vlan 20, site A only
+    hB1:    {kind: arista_ceos, startup-config: configs/active/hB1.cfg}   # vlan 10, stretched
+    hB2:    {kind: arista_ceos, startup-config: configs/active/hB2.cfg}   # vlan 30, site B only
+
+  links:
+    # site A fabric
+    - endpoints: ["spineA:eth1", "leafA:eth1"]
+    - endpoints: ["spineA:eth2", "bgwA:eth1"]
+    # site B fabric
+    - endpoints: ["spineB:eth1", "leafB:eth1"]
+    - endpoints: ["spineB:eth2", "bgwB:eth1"]
+    # the DCI
+    - endpoints: ["bgwA:eth3", "bgwB:eth3"]
+    # hosts
+    - endpoints: ["leafA:eth3", "hA1:eth1"]
+    - endpoints: ["leafA:eth4", "hA2:eth1"]
+    - endpoints: ["leafB:eth3", "hB1:eth1"]
+    - endpoints: ["leafB:eth4", "hB2:eth1"]

@@ -1,0 +1,48 @@
+# bgp-lab10 | BGP security at an internet edge
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+#   AS 65100 ours: core, edge1, edge2    OSPF + iBGP full mesh
+#   AS 65200 transit   leaks RFC1918 alongside its real space
+#   AS 65400 peer1     leaks RFC1918
+#   AS 65500 cust1     well behaved, the control
+#   AS 65501 cust2     hijacks our space, announces bogons and unregistered
+#                      more-specifics, and announces one prefix with our own
+#                      ASN already in the path
+#
+# Every external neighbour misbehaves on purpose. That is the lab's input,
+# not a fault. Your edge is supposed to survive it without you noticing.
+#
+# Deploy one mode at a time:  ./lab.sh deploy solution   (also: base)
+name: bgp-lab10
+
+mgmt:
+  network: clab-bgp-lab10
+  ipv4-subnet: 172.31.110.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    core:    {kind: arista_ceos, startup-config: configs/active/core.cfg}
+    edge1:   {kind: arista_ceos, startup-config: configs/active/edge1.cfg}
+    edge2:   {kind: arista_ceos, startup-config: configs/active/edge2.cfg}
+    transit: {kind: arista_ceos, startup-config: configs/active/transit.cfg}
+    peer1:   {kind: arista_ceos, startup-config: configs/active/peer1.cfg}
+    cust1:   {kind: arista_ceos, startup-config: configs/active/cust1.cfg}
+    cust2:   {kind: arista_ceos, startup-config: configs/active/cust2.cfg}
+    h1:      {kind: arista_ceos, startup-config: configs/active/h1.cfg}
+
+  links:
+    # internal
+    - endpoints: ["core:eth1", "edge1:eth1"]
+    - endpoints: ["core:eth2", "edge2:eth1"]
+    - endpoints: ["edge1:eth2", "edge2:eth2"]
+    # our eBGP edge
+    - endpoints: ["edge1:eth3", "transit:eth1"]
+    - endpoints: ["edge1:eth4", "peer1:eth1"]
+    - endpoints: ["edge2:eth3", "cust1:eth1"]
+    - endpoints: ["edge2:eth4", "cust2:eth1"]
+    # host
+    - endpoints: ["core:eth3", "h1:eth1"]

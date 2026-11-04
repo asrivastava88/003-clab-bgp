@@ -1,0 +1,50 @@
+# bgp-lab07 | Multi-VRF EVPN-VXLAN: RT leaking vs centralized fusion vs isolation
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+#   RED, BLUE, GREEN  tenant VRFs       SHARED  shared-services VRF
+#   tenant <-> SHARED : route-target leaking, no device in the path
+#   RED <-> BLUE      : forced through fw, so it can be inspected
+#   GREEN             : SHARED only. Nobody reaches GREEN.
+#
+# Deploy one mode at a time:  ./lab.sh deploy solution   (also: base)
+name: bgp-lab07
+
+mgmt:
+  network: clab-bgp-lab07
+  ipv4-subnet: 172.31.107.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+    fw:     {kind: arista_ceos, startup-config: configs/active/fw.cfg}
+    # ---- tenants ----
+    hR1:    {kind: arista_ceos, startup-config: configs/active/hR1.cfg}   # RED,   leaf1
+    hB1:    {kind: arista_ceos, startup-config: configs/active/hB1.cfg}   # BLUE,  leaf1
+    hR2:    {kind: arista_ceos, startup-config: configs/active/hR2.cfg}   # RED,   leaf2 (same subnet as hR1)
+    hG1:    {kind: arista_ceos, startup-config: configs/active/hG1.cfg}   # GREEN, leaf2
+    hS1:    {kind: arista_ceos, startup-config: configs/active/hS1.cfg}   # SHARED services, leaf2
+
+  links:
+    # fabric: spine EthN -> leaf1, leaf2, bleaf1; every leaf Eth1 -> spine1, Eth2 -> spine2
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "bleaf1:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "bleaf1:eth2"]
+    # fusion handoff: one link, dot1q 101 = RED, 102 = BLUE
+    - endpoints: ["bleaf1:eth3", "fw:eth1"]
+    # hosts
+    - endpoints: ["leaf1:eth3", "hR1:eth1"]
+    - endpoints: ["leaf1:eth4", "hB1:eth1"]
+    - endpoints: ["leaf2:eth3", "hR2:eth1"]
+    - endpoints: ["leaf2:eth4", "hG1:eth1"]
+    - endpoints: ["leaf2:eth5", "hS1:eth1"]

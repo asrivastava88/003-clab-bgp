@@ -1,0 +1,51 @@
+# bgp-lab09 | Convergence and resiliency engineering
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+# An ordinary EVPN-VXLAN fabric. The subject is not whether it works, it is
+# how long it takes to notice when something stops working.
+#
+#   spine1, spine2  AS 65100   leaf1 65101, leaf2 65102
+#   bleaf1 65104, bleaf2 65105   two borders, so the VRF has two default routes
+#   wan 65200, sends a default to both and originates 203.0.113.0/24
+#
+# Deploy one mode at a time:  ./lab.sh deploy solution   (also: base)
+name: bgp-lab09
+
+mgmt:
+  network: clab-bgp-lab09
+  ipv4-subnet: 172.31.109.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+    bleaf2: {kind: arista_ceos, startup-config: configs/active/bleaf2.cfg}
+    wan:    {kind: arista_ceos, startup-config: configs/active/wan.cfg}
+    h1:     {kind: arista_ceos, startup-config: configs/active/h1.cfg}
+    h2:     {kind: arista_ceos, startup-config: configs/active/h2.cfg}
+    h3:     {kind: arista_ceos, startup-config: configs/active/h3.cfg}
+
+  links:
+    # fabric: spine EthN -> leaf1, leaf2, bleaf1; every leaf Eth1 -> spine1, Eth2 -> spine2
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "bleaf1:eth1"]
+    - endpoints: ["spine1:eth4", "bleaf2:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "bleaf1:eth2"]
+    - endpoints: ["spine2:eth4", "bleaf2:eth2"]
+    # edge
+    - endpoints: ["bleaf1:eth3", "wan:eth1"]
+    - endpoints: ["bleaf2:eth3", "wan:eth2"]
+    # hosts
+    - endpoints: ["leaf1:eth3", "h1:eth1"]
+    - endpoints: ["leaf2:eth3", "h2:eth1"]
+    - endpoints: ["leaf2:eth4", "h3:eth1"]

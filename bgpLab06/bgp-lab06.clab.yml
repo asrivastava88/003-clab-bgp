@@ -1,0 +1,47 @@
+# bgp-lab06 | Pure BGP: a multi-AS internet edge. No EVPN, no VXLAN, no VRFs.
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+#   AS 65100  core, edge1, edge2    ours. OSPF underlay + iBGP full mesh
+#   AS 65200  transitA              upstream, sends a default
+#   AS 65300  transitB              upstream, sends a default
+#   AS 65400  peerX                 settlement-free peer
+#   AS 65500  cust1                 our customer
+#   AS 65600  far                   remote network, reachable three ways
+#
+# Deploy one mode at a time:  ./lab.sh deploy solution   (also: base)
+name: bgp-lab06
+
+mgmt:
+  network: clab-bgp-lab06
+  ipv4-subnet: 172.31.106.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    core:     {kind: arista_ceos, startup-config: configs/active/core.cfg}
+    edge1:    {kind: arista_ceos, startup-config: configs/active/edge1.cfg}
+    edge2:    {kind: arista_ceos, startup-config: configs/active/edge2.cfg}
+    transitA: {kind: arista_ceos, startup-config: configs/active/transitA.cfg}
+    transitB: {kind: arista_ceos, startup-config: configs/active/transitB.cfg}
+    peerX:    {kind: arista_ceos, startup-config: configs/active/peerX.cfg}
+    cust1:    {kind: arista_ceos, startup-config: configs/active/cust1.cfg}
+    far:      {kind: arista_ceos, startup-config: configs/active/far.cfg}
+
+  links:
+    # internal, OSPF. costs make core prefer edge1: 10 vs 30, with the
+    # edge1-edge2 link at 100 so it is never a transit path by accident
+    - endpoints: ["core:eth1", "edge1:eth1"]
+    - endpoints: ["core:eth2", "edge2:eth1"]
+    - endpoints: ["edge1:eth2", "edge2:eth2"]
+    # our eBGP edge
+    - endpoints: ["edge1:eth3", "transitA:eth1"]
+    - endpoints: ["edge1:eth4", "peerX:eth1"]
+    - endpoints: ["edge2:eth3", "transitB:eth1"]
+    - endpoints: ["edge2:eth4", "cust1:eth1"]
+    # the rest of the internet
+    - endpoints: ["transitA:eth2", "far:eth1"]
+    - endpoints: ["transitB:eth2", "far:eth2"]
+    - endpoints: ["peerX:eth2", "far:eth3"]
