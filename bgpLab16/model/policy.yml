@@ -1,0 +1,24 @@
+# bgp-lab16 | policy intent.
+#
+# Separate from the topology on purpose: topology changes when you build, and
+# policy changes when you negotiate. The audit checks both, from here.
+
+local_pref:
+  peer:    200
+  transit: 100
+
+communities:
+  peer:    "65010:200"
+  transit: "65010:100"
+
+# Our own space. Each region originates one /24 and one /48 out of it, so that
+# an aggregate exists and a per-region more-specific exists.
+ours:
+  aggregate4: "198.18.0.0/22"
+  region4: "198.18.{R}.0/24"
+
+filters:
+  max_prefix_transit: 12000
+  max_prefix_peer: 500
+  # the longest prefix we will accept from anyone
+  max_len4: 24

@@ -1,0 +1,147 @@
+# bgp-lab14 | Global backbone traffic engineering: hot potato, cold potato,
+#             MED, anycast and selective announcement
+# containerlab 0.79.0 | cEOS 4.36.0.1F
+#
+# AS 65010 is a global content network with four PoPs on a ring. One transit AS
+# peers with it at all four, which is the only arrangement in which MED and
+# hot/cold-potato routing mean anything: MED is only comparable between paths
+# from the same neighbouring AS.
+#
+# Every MED in this lab is milliseconds of somebody's backbone. The ring costs
+# are the netem delay, the OSPF cost and the MED, all the same number, so the
+# arithmetic in every tool traces back to the fibre.
+#
+#   sea --65ms-- ash --75ms-- lhr --160ms-- sin --175ms-- sea
+#
+# Our space: RFC 5737 documentation prefixes plus 198.18.0.0/15 (RFC 2544).
+# Peer space: 100.64.0.0/10 (RFC 6598). None of it is globally routed.
+# Every network name is fictional.
+name: bgp-lab14
+
+mgmt:
+  network: clab-bgp-lab14
+  ipv4-subnet: 172.31.114.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    sea:      {kind: arista_ceos, startup-config: configs/active/sea.cfg}   # AS 65010 PoP, Seattle
+    ash:      {kind: arista_ceos, startup-config: configs/active/ash.cfg}   # AS 65010 PoP, Ashburn
+    lhr:      {kind: arista_ceos, startup-config: configs/active/lhr.cfg}   # AS 65010 PoP, London
+    sin:      {kind: arista_ceos, startup-config: configs/active/sin.cfg}   # AS 65010 PoP, Singapore
+    gttw:     {kind: arista_ceos, startup-config: configs/active/gttw.cfg}   # AS 65100 transit, west
+    gtte:     {kind: arista_ceos, startup-config: configs/active/gtte.cfg}   # AS 65100 transit, east
+    cdn:      {kind: arista_ceos, startup-config: configs/active/cdn.cfg}   # AS 65300 CDN, PNI at two PoPs
+    peereu:   {kind: arista_ceos, startup-config: configs/active/peereu.cfg}   # AS 65400 European peer
+
+  # Extended link format so every span carries an explicit MTU: 9100 on the
+  # backbone and the PNIs, 1500 on every handoff, which is what the real world
+  # looks like. Latency is applied with netem on deploy, from tools/topology.py.
+  links:
+    # HANDOFF Seattle: AS 65010 <-> AS 65100
+    - type: veth
+      endpoints:
+        - node: sea
+          interface: eth1
+        - node: gttw
+          interface: eth1
+      mtu: 1500
+    # HANDOFF Singapore
+    - type: veth
+      endpoints:
+        - node: sin
+          interface: eth1
+        - node: gttw
+          interface: eth2
+      mtu: 1500
+    # HANDOFF Ashburn
+    - type: veth
+      endpoints:
+        - node: ash
+          interface: eth1
+        - node: gtte
+          interface: eth1
+      mtu: 1500
+    # HANDOFF London
+    - type: veth
+      endpoints:
+        - node: lhr
+          interface: eth1
+        - node: gtte
+          interface: eth2
+      mtu: 1500
+    # the transit's own backbone, 70ms
+    - type: veth
+      endpoints:
+        - node: gttw
+          interface: eth3
+        - node: gtte
+          interface: eth3
+      mtu: 9100
+    # BACKBONE sea-ash 65ms
+    - type: veth
+      endpoints:
+        - node: sea
+          interface: eth2
+        - node: ash
+          interface: eth2
+      mtu: 9100
+    # BACKBONE ash-lhr 75ms, transatlantic
+    - type: veth
+      endpoints:
+        - node: ash
+          interface: eth3
+        - node: lhr
+          interface: eth2
+      mtu: 9100
+    # BACKBONE lhr-sin 160ms
+    - type: veth
+      endpoints:
+        - node: lhr
+          interface: eth3
+        - node: sin
+          interface: eth2
+      mtu: 9100
+    # BACKBONE sin-sea 175ms, transpacific
+    - type: veth
+      endpoints:
+        - node: sin
+          interface: eth3
+        - node: sea
+          interface: eth3
+      mtu: 9100
+    # PNI to the CDN at London
+    - type: veth
+      endpoints:
+        - node: lhr
+          interface: eth4
+        - node: cdn
+          interface: eth1
+      mtu: 9100
+    # PNI to the CDN at Singapore
+    - type: veth
+      endpoints:
+        - node: sin
+          interface: eth4
+        - node: cdn
+          interface: eth2
+      mtu: 9100
+    # peering with the European network, London only
+    - type: veth
+      endpoints:
+        - node: lhr
+          interface: eth5
+        - node: peereu
+          interface: eth1
+      mtu: 1500
+    # the European network is also a transit customer
+    - type: veth
+      endpoints:
+        - node: gtte
+          interface: eth4
+        - node: peereu
+          interface: eth2
+      mtu: 1500

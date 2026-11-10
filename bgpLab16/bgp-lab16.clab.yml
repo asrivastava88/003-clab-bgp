@@ -1,0 +1,120 @@
+# bgp-lab16 | GENERATED from model/network.yml by tools/render.py
+# The topology is an output of the model, not an input to it.
+name: bgp-lab16
+
+mgmt:
+  network: clab-bgp-lab16
+  ipv4-subnet: 172.31.116.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    est-r1:     {kind: arista_ceos, startup-config: configs/active/est-r1.cfg}   # Ashburn, route reflector
+    est-r2:     {kind: arista_ceos, startup-config: configs/active/est-r2.cfg}   # Ashburn
+    eur-r1:     {kind: arista_ceos, startup-config: configs/active/eur-r1.cfg}   # London, route reflector
+    eur-r2:     {kind: arista_ceos, startup-config: configs/active/eur-r2.cfg}   # London
+    wst-r1:     {kind: arista_ceos, startup-config: configs/active/wst-r1.cfg}   # Seattle, route reflector
+    wst-r2:     {kind: arista_ceos, startup-config: configs/active/wst-r2.cfg}   # Seattle
+    peer1:      {kind: arista_ceos, startup-config: configs/active/peer1.cfg}   # AS 65300
+    transit1:   {kind: arista_ceos, startup-config: configs/active/transit1.cfg}   # AS 65100
+
+  links:
+    # link 1: 65ms inter-region, OSPF cost 65
+    - type: veth
+      endpoints:
+        - node: wst-r1
+          interface: eth1
+        - node: est-r1
+          interface: eth3
+      mtu: 9100
+    # link 2: 75ms inter-region, OSPF cost 75
+    - type: veth
+      endpoints:
+        - node: est-r1
+          interface: eth2
+        - node: eur-r1
+          interface: eth1
+      mtu: 9100
+    # link 3: 130ms inter-region, OSPF cost 130
+    - type: veth
+      endpoints:
+        - node: eur-r1
+          interface: eth3
+        - node: wst-r1
+          interface: eth2
+      mtu: 9100
+    # link 4: 68ms inter-region, OSPF cost 68
+    - type: veth
+      endpoints:
+        - node: wst-r2
+          interface: eth1
+        - node: est-r2
+          interface: eth3
+      mtu: 9100
+    # link 5: 78ms inter-region, OSPF cost 78
+    - type: veth
+      endpoints:
+        - node: est-r2
+          interface: eth2
+        - node: eur-r2
+          interface: eth1
+      mtu: 9100
+    # link 6: 134ms inter-region, OSPF cost 134
+    - type: veth
+      endpoints:
+        - node: eur-r2
+          interface: eth3
+        - node: wst-r2
+          interface: eth2
+      mtu: 9100
+    # link 7: intra-region, OSPF cost 10
+    - type: veth
+      endpoints:
+        - node: wst-r1
+          interface: eth3
+        - node: wst-r2
+          interface: eth3
+      mtu: 9100
+    # link 8: intra-region, OSPF cost 10
+    - type: veth
+      endpoints:
+        - node: est-r1
+          interface: eth1
+        - node: est-r2
+          interface: eth1
+      mtu: 9100
+    # link 9: intra-region, OSPF cost 10
+    - type: veth
+      endpoints:
+        - node: eur-r1
+          interface: eth2
+        - node: eur-r2
+          interface: eth2
+      mtu: 9100
+    # link 10: transit handoff to AS 65100
+    - type: veth
+      endpoints:
+        - node: wst-r1
+          interface: eth4
+        - node: transit1
+          interface: eth1
+      mtu: 1500
+    # link 11: transit handoff to AS 65100
+    - type: veth
+      endpoints:
+        - node: eur-r1
+          interface: eth4
+        - node: transit1
+          interface: eth2
+      mtu: 1500
+    # link 12: peer handoff to AS 65300
+    - type: veth
+      endpoints:
+        - node: est-r2
+          interface: eth4
+        - node: peer1
+          interface: eth1
+      mtu: 1500

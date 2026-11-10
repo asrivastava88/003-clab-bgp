@@ -1,0 +1,281 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "scriptButtonAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "wst-ss1",
+      "position": {
+        "x": 240,
+        "y": 120
+      }
+    },
+    {
+      "id": "wst-ss2",
+      "position": {
+        "x": 140,
+        "y": 140
+      }
+    },
+    {
+      "id": "wst-p1-s1",
+      "position": {
+        "x": 180,
+        "y": -20
+      }
+    },
+    {
+      "id": "wst-p1-s2",
+      "position": {
+        "x": 80,
+        "y": 20
+      }
+    },
+    {
+      "id": "wst-p1-l1",
+      "position": {
+        "x": 60,
+        "y": -140
+      }
+    },
+    {
+      "id": "wst-p1-l2",
+      "position": {
+        "x": 160,
+        "y": -160
+      }
+    },
+    {
+      "id": "wst-p2-s1",
+      "position": {
+        "x": 340,
+        "y": 40
+      }
+    },
+    {
+      "id": "wst-p2-s2",
+      "position": {
+        "x": 280,
+        "y": -20
+      }
+    },
+    {
+      "id": "wst-p2-l1",
+      "position": {
+        "x": 380,
+        "y": -140
+      }
+    },
+    {
+      "id": "wst-p2-l2",
+      "position": {
+        "x": 440,
+        "y": -80
+      }
+    },
+    {
+      "id": "wst-b1",
+      "position": {
+        "x": 280,
+        "y": 280
+      }
+    },
+    {
+      "id": "wst-b2",
+      "position": {
+        "x": 180,
+        "y": 300
+      }
+    },
+    {
+      "id": "est-ss1",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "est-ss2",
+      "position": {
+        "x": 620,
+        "y": 320
+      }
+    },
+    {
+      "id": "est-p1-s1",
+      "position": {
+        "x": 680,
+        "y": 120
+      }
+    },
+    {
+      "id": "est-p1-s2",
+      "position": {
+        "x": 760,
+        "y": 280
+      }
+    },
+    {
+      "id": "est-p1-l1",
+      "position": {
+        "x": 820,
+        "y": 80
+      }
+    },
+    {
+      "id": "est-p1-l2",
+      "position": {
+        "x": 880,
+        "y": 160
+      }
+    },
+    {
+      "id": "est-p2-s1",
+      "position": {
+        "x": 680,
+        "y": 220
+      }
+    },
+    {
+      "id": "est-p2-s2",
+      "position": {
+        "x": 760,
+        "y": 180
+      }
+    },
+    {
+      "id": "est-p2-l1",
+      "position": {
+        "x": 800,
+        "y": 360
+      }
+    },
+    {
+      "id": "est-p2-l2",
+      "position": {
+        "x": 860,
+        "y": 300
+      }
+    },
+    {
+      "id": "est-b1",
+      "position": {
+        "x": 420,
+        "y": 300
+      }
+    },
+    {
+      "id": "est-b2",
+      "position": {
+        "x": 480,
+        "y": 400
+      }
+    },
+    {
+      "id": "eur-ss1",
+      "position": {
+        "x": 460,
+        "y": 680
+      }
+    },
+    {
+      "id": "eur-ss2",
+      "position": {
+        "x": 440,
+        "y": 780
+      }
+    },
+    {
+      "id": "eur-p1-s1",
+      "position": {
+        "x": 620,
+        "y": 720
+      }
+    },
+    {
+      "id": "eur-p1-s2",
+      "position": {
+        "x": 600,
+        "y": 820
+      }
+    },
+    {
+      "id": "eur-p1-l1",
+      "position": {
+        "x": 740,
+        "y": 840
+      }
+    },
+    {
+      "id": "eur-p1-l2",
+      "position": {
+        "x": 760,
+        "y": 740
+      }
+    },
+    {
+      "id": "eur-p2-s1",
+      "position": {
+        "x": 300,
+        "y": 760
+      }
+    },
+    {
+      "id": "eur-p2-s2",
+      "position": {
+        "x": 360,
+        "y": 860
+      }
+    },
+    {
+      "id": "eur-p2-l1",
+      "position": {
+        "x": 180,
+        "y": 860
+      }
+    },
+    {
+      "id": "eur-p2-l2",
+      "position": {
+        "x": 240,
+        "y": 940
+      }
+    },
+    {
+      "id": "eur-b1",
+      "position": {
+        "x": 320,
+        "y": 620
+      }
+    },
+    {
+      "id": "eur-b2",
+      "position": {
+        "x": 400,
+        "y": 560
+      }
+    },
+    {
+      "id": "wan1",
+      "position": {
+        "x": 260,
+        "y": 440
+      }
+    },
+    {
+      "id": "wan2",
+      "position": {
+        "x": 360,
+        "y": 420
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {
+    "nodeStyle": "boxed"
+  }
+}

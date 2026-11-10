@@ -1,0 +1,110 @@
+# bgp-lab15 | A dual-stack carrier edge, and what happens when the two
+#             address families stop agreeing
+# containerlab 0.79.0 | cEOS 4.36.0.1F
+#
+# AS 65010 runs two borders, buys two transits, peers with one network in both
+# address families and with another in IPv6 ONLY, and sells transit to one
+# customer. Every external relationship is TWO BGP sessions, one per address
+# family -- which is what most networks run, and is exactly why the families
+# drift apart.
+#
+# A dual-stack network is two networks that share a chassis. It is configured
+# twice, changed twice, and monitored once: in IPv4.
+#
+# Our space: 198.18.0.0/15 (RFC 2544) as /23s, and 2001:db8 (RFC 3849) as /44s,
+# so a more-specific of our own space exists to be filtered. Customer space is
+# RFC 5737, peer space RFC 6598. None of it is globally routed. Names are
+# fictional.
+name: bgp-lab15
+
+mgmt:
+  network: clab-bgp-lab15
+  ipv4-subnet: 172.31.115.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    edge1:      {kind: arista_ceos, startup-config: configs/active/edge1.cfg}   # AS 65010 border, holds the customer
+    edge2:      {kind: arista_ceos, startup-config: configs/active/edge2.cfg}   # AS 65010 border, holds the backup transit
+    transit1:   {kind: arista_ceos, startup-config: configs/active/transit1.cfg}   # AS 65100 primary transit, dual stack
+    transit2:   {kind: arista_ceos, startup-config: configs/active/transit2.cfg}   # AS 65200 backup transit, dual stack
+    peer1:      {kind: arista_ceos, startup-config: configs/active/peer1.cfg}   # AS 65300 settlement-free peer, dual stack
+    peer2:      {kind: arista_ceos, startup-config: configs/active/peer2.cfg}   # AS 65301 settlement-free peer, IPv6 ONLY
+    cust1:      {kind: arista_ceos, startup-config: configs/active/cust1.cfg}   # AS 65400 our transit customer, dual stack
+
+  links:
+    # TRANSIT1 handoff, dual stack
+    - type: veth
+      endpoints:
+        - node: edge1
+          interface: eth1
+        - node: transit1
+          interface: eth1
+      mtu: 1500
+    # TRANSIT1 second handoff, dual stack
+    - type: veth
+      endpoints:
+        - node: edge2
+          interface: eth1
+        - node: transit1
+          interface: eth2
+      mtu: 1500
+    # TRANSIT2 handoff, backup transit
+    - type: veth
+      endpoints:
+        - node: edge2
+          interface: eth2
+        - node: transit2
+          interface: eth1
+      mtu: 1500
+    # PNI to peer1, dual stack
+    - type: veth
+      endpoints:
+        - node: edge1
+          interface: eth2
+        - node: peer1
+          interface: eth1
+      mtu: 1500
+    # PNI to peer1, second border
+    - type: veth
+      endpoints:
+        - node: edge2
+          interface: eth3
+        - node: peer1
+          interface: eth2
+      mtu: 1500
+    # peer2: IPv6 only, no IPv4 on this link at all
+    - type: veth
+      endpoints:
+        - node: edge1
+          interface: eth3
+        - node: peer2
+          interface: eth1
+      mtu: 1500
+    # peer2: IPv6 only, second border
+    - type: veth
+      endpoints:
+        - node: edge2
+          interface: eth4
+        - node: peer2
+          interface: eth2
+      mtu: 1500
+    # our transit customer, dual stack
+    - type: veth
+      endpoints:
+        - node: edge1
+          interface: eth4
+        - node: cust1
+          interface: eth1
+      mtu: 1500
+    # internal link between the two borders
+    - type: veth
+      endpoints:
+        - node: edge1
+          interface: eth5
+        - node: edge2
+          interface: eth5
+      mtu: 9100

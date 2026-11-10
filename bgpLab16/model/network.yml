@@ -1,0 +1,63 @@
+# bgp-lab16 | the model. This file is the network.
+#
+# Nothing in this lab is hand-allocated. Every address, ASN, interface
+# assignment and IGP cost is COMPUTED from the rules below, which is how an
+# operator runs a backbone they cannot hold in their head. The rules are the
+# design; the YAML below is just its inputs.
+#
+# tools/model.py turns this into a full plan, tools/render.py turns the plan
+# into configs and the containerlab topology, and tools/audit.py compares the
+# plan against what the routers actually say.
+
+asn: 65010
+name: "NORTHSTAR"
+
+# Region id and router id are the only two numbers a human chooses. Every
+# address in the network is a function of them.
+regions:
+  wst: {id: 1, city: "Seattle"}
+  est: {id: 2, city: "Ashburn"}
+  eur: {id: 3, city: "London"}
+
+routers: [r1, r2]          # r1 is the route reflector in every region
+
+rules:
+  # {R} = region id, {N} = router id, {L} = link id
+  loopback4:     "10.{R}.0.{N}/32"
+  p2p4:          "10.254.{L}.0/31"
+  # interfaces are assigned in a defined order, not by whoever cabled it:
+  # backbone links sorted by the far end's name, then external links.
+  interface_order: "peer-name"
+  mtu_backbone:  9100
+  mtu_handoff:   1500
+  ospf_cost_intra: 10        # inside a region
+  ospf_cost_inter: "rtt"     # between regions, the measured RTT in ms
+  route_reflector: r1        # per region
+  router_id: "loopback4"
+
+# Two planes. r1 of every region forms one triangle, r2 forms the other, and
+# the planes meet only inside a region. RTT is measured, in milliseconds, and
+# is also the OSPF cost -- one number, so the config traces back to the fibre.
+backbone:
+  - {a: wst-r1, b: est-r1, rtt: 65}
+  - {a: est-r1, b: eur-r1, rtt: 75}
+  - {a: eur-r1, b: wst-r1, rtt: 130}
+  - {a: wst-r2, b: est-r2, rtt: 68}
+  - {a: est-r2, b: eur-r2, rtt: 78}
+  - {a: eur-r2, b: wst-r2, rtt: 134}
+  - {a: wst-r1, b: wst-r2, intra: true}
+  - {a: est-r1, b: est-r2, intra: true}
+  - {a: eur-r1, b: eur-r2, intra: true}
+
+# Where we touch other networks.
+external:
+  - {device: wst-r1, peer: transit1, asn: 65100, kind: transit}
+  - {device: eur-r1, peer: transit1, asn: 65100, kind: transit}
+  - {device: est-r2, peer: peer1,    asn: 65300, kind: peer}
+
+# External AS facts, so the model can render the other side of each link too.
+peers:
+  transit1: {asn: 65100, prefixes4: ["100.100.0.0/16", "100.200.0.0/16"],
+             hosts: ["100.100.0.1", "100.200.0.1"]}
+  peer1:    {asn: 65300, prefixes4: ["100.110.0.0/16"],
+             hosts: ["100.110.0.1"]}

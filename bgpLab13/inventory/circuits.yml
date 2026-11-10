@@ -1,0 +1,198 @@
+# bgp-lab13 | physical circuit inventory
+#
+# This file is the point of the lab. BGP knows nothing about conduits, cable
+# landing stations or whether two "diverse" circuits share a duct under 4th
+# Avenue. Diversity is a property of the physical plant, and the only place it
+# is recorded is an inventory like this one.
+#
+# Everything here is fictional. Facility and cable names are of the kind used
+# in real route diversity work, so the exercise reads like the real thing.
+#
+# Fields:
+#   kind        darkfiber | wave | carrier-ethernet | ip-transit | cloud-ic | ix-port
+#   protection  none | 1+1 | restorable   (1+1 survives a cut in <50ms, invisible to BGP)
+#   srlg        shared-risk link groups. Two circuits sharing ANY entry share fate.
+#   rtt_ms      measured round trip, applied as netem delay on deploy
+#   protect_rtt_ms  RTT after a 1+1 switch to the protect path (longer, always)
+#   mrc_usd     monthly recurring charge
+#   usage_usd_mbps  for IP transit: per-Mbps commit rate
+
+facilities:
+  WESTIN:   {name: "Westin Building Exchange", city: "Seattle, WA",  role: "carrier hotel"}
+  TUKW:     {name: "Tukwila DC",               city: "Tukwila, WA",  role: "our second site"}
+  ASHB:     {name: "Ashburn DC",               city: "Ashburn, VA",  role: "east coast site"}
+  TOKYO:    {name: "Otemachi",                 city: "Tokyo, JP",    role: "transpacific handoff"}
+
+landing_stations:
+  HARBOUR-POINTE: {city: "Mukilteo, WA", cables: [TRANSPAC-1, TRANSPAC-2]}
+  PACIFIC-CITY:   {city: "Pacific City, OR", cables: [TRANSPAC-3]}
+
+subsea_cables:
+  TRANSPAC-1: {route: "Mukilteo WA - Shima JP", length_km: 9100, fibre_pairs: 6, year: 2016}
+  TRANSPAC-2: {route: "Mukilteo WA - Maruyama JP", length_km: 9400, fibre_pairs: 8, year: 2021}
+  TRANSPAC-3: {route: "Pacific City OR - Toyohashi JP", length_km: 9800, fibre_pairs: 12, year: 2023}
+
+circuits:
+
+  # ---- metro: our own dark fibre, our own optics ----
+  - id: DF-SEA-001
+    desc: "Metro dark fibre, Westin to Tukwila, 1x100G alien wave on our own transponders"
+    kind: darkfiber
+    a_end: {node: sea1, port: Ethernet5, facility: WESTIN}
+    z_end: {node: sea2, port: Ethernet5, facility: TUKW}
+    carrier: "Puget Metro Fibre (IRU, 20yr)"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-4TH-AVE, CDT-TUKWILA-S]
+    rtt_ms: 0.4
+    mrc_usd: 2800
+
+  # ---- long haul: two waves, bought from two carriers, on paper diverse ----
+  - id: WAVE-SEA-ASH-A
+    desc: "Protected 100G wave, Seattle to Ashburn, northern route via Chicago"
+    kind: wave
+    a_end: {node: sea1, port: Ethernet6, facility: WESTIN}
+    z_end: {node: ash1, port: Ethernet1, facility: ASHB}
+    carrier: "Continental Lightwave"
+    capacity: "100G"
+    protection: "1+1"
+    srlg: [CDT-4TH-AVE, LH-NORTHERN-I90, CDT-ASHB-E]
+    rtt_ms: 65
+    protect_rtt_ms: 78
+    mrc_usd: 14500
+
+  - id: WAVE-SEA-ASH-B
+    desc: "Unprotected 100G wave, Seattle to Ashburn, southern route via Denver"
+    kind: wave
+    a_end: {node: sea2, port: Ethernet6, facility: TUKW}
+    z_end: {node: ash1, port: Ethernet2, facility: ASHB}
+    carrier: "Meridian Transport"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-TUKWILA-S, LH-SOUTHERN-I80, CDT-ASHB-E]
+    rtt_ms: 71
+    mrc_usd: 9800
+
+  # ---- IP transit ----
+  - id: TRANSIT-1A
+    desc: "IP transit, primary, delivered at Westin"
+    kind: ip-transit
+    a_end: {node: sea1, port: Ethernet1, facility: WESTIN}
+    z_end: {node: transit1, port: Ethernet1, facility: WESTIN}
+    carrier: "PACRIM (AS65100)"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-4TH-AVE, WESTIN-MMR-A]
+    rtt_ms: 0.2
+    mrc_usd: 0
+    usage_usd_mbps: 0.38
+
+  - id: TRANSIT-1B
+    desc: "IP transit, same carrier, second site. Sold to us as a diverse circuit."
+    kind: ip-transit
+    a_end: {node: sea2, port: Ethernet1, facility: TUKW}
+    z_end: {node: transit1, port: Ethernet2, facility: WESTIN}
+    carrier: "PACRIM (AS65100)"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-4TH-AVE, WESTIN-MMR-A]
+    rtt_ms: 0.6
+    mrc_usd: 0
+    usage_usd_mbps: 0.38
+
+  - id: TRANSIT-2
+    desc: "IP transit, backup, delivered in Tokyo over a transpacific cable"
+    kind: ip-transit
+    a_end: {node: sea2, port: Ethernet7, facility: TUKW}
+    z_end: {node: transit2, port: Ethernet1, facility: TOKYO}
+    carrier: "TRANSPAC (AS65200)"
+    capacity: "10G"
+    protection: restorable
+    srlg: [CDT-TUKWILA-S, CABLE-TRANSPAC-1, CLS-HARBOUR-POINTE]
+    subsea: {cable: TRANSPAC-1, landing: HARBOUR-POINTE}
+    rtt_ms: 95
+    mrc_usd: 0
+    usage_usd_mbps: 1.10
+
+  # ---- internet exchange ----
+  - id: IX-PORT-A
+    desc: "Seattle IX, 100G port, Westin MMR-A"
+    kind: ix-port
+    a_end: {node: sea1, port: Ethernet2, facility: WESTIN}
+    z_end: {node: ixfab, port: eth4, facility: WESTIN}
+    carrier: "Seattle Exchange"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-4TH-AVE, WESTIN-MMR-A, IX-FABRIC-SEA]
+    rtt_ms: 0.2
+    mrc_usd: 1200
+
+  - id: IX-PORT-B
+    desc: "Seattle IX, 100G port, Westin MMR-B. Second port for IX redundancy."
+    kind: ix-port
+    a_end: {node: sea2, port: Ethernet2, facility: TUKW}
+    z_end: {node: ixfab, port: eth5, facility: WESTIN}
+    carrier: "Seattle Exchange"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-TUKWILA-S, WESTIN-MMR-B, IX-FABRIC-SEA]
+    rtt_ms: 0.6
+    mrc_usd: 1200
+
+  # ---- private network interconnect to a CDN ----
+  - id: PNI-CDN-A
+    desc: "PNI to SOUNDVIEW CDN, cross connect at Westin"
+    kind: carrier-ethernet
+    a_end: {node: sea1, port: Ethernet3, facility: WESTIN}
+    z_end: {node: cdn1, port: Ethernet1, facility: WESTIN}
+    carrier: "cross connect (SOUNDVIEW AS65500)"
+    capacity: "100G"
+    protection: none
+    srlg: [WESTIN-MMR-A]
+    rtt_ms: 0.1
+    mrc_usd: 350
+
+  - id: PNI-CDN-B
+    desc: "PNI to SOUNDVIEW CDN, backhauled to Tukwila"
+    kind: carrier-ethernet
+    a_end: {node: sea2, port: Ethernet3, facility: TUKW}
+    z_end: {node: cdn1, port: Ethernet2, facility: WESTIN}
+    carrier: "Puget Metro Fibre EPL (SOUNDVIEW AS65500)"
+    capacity: "100G"
+    protection: none
+    srlg: [CDT-4TH-AVE, CDT-TUKWILA-S, WESTIN-MMR-A]
+    rtt_ms: 0.7
+    mrc_usd: 1900
+
+  # ---- cloud interconnect, the redundant pair ----
+  - id: CLOUD-IC-A
+    desc: "Cloud interconnect, primary circuit, provider edge at Westin"
+    kind: cloud-ic
+    a_end: {node: sea1, port: Ethernet4, facility: WESTIN}
+    z_end: {node: cloudgw, port: Ethernet1, facility: WESTIN}
+    carrier: "Cloud peering (AS65600) via Puget Metro Fibre"
+    capacity: "10G"
+    protection: none
+    srlg: [CDT-4TH-AVE, WESTIN-MMR-A, CLOUD-PE-SEA01]
+    rtt_ms: 1.2
+    mrc_usd: 1650
+
+  - id: CLOUD-IC-B
+    desc: "Cloud interconnect, secondary circuit. Ordered as diverse."
+    kind: cloud-ic
+    a_end: {node: sea2, port: Ethernet4, facility: TUKW}
+    z_end: {node: cloudgw, port: Ethernet2, facility: WESTIN}
+    carrier: "Cloud peering (AS65600) via Puget Metro Fibre"
+    capacity: "10G"
+    protection: none
+    srlg: [CDT-TUKWILA-S, WESTIN-MMR-A, CLOUD-PE-SEA01]
+    rtt_ms: 1.8
+    mrc_usd: 1650
+
+# Assumed steady-state egress, Mbps, by destination class. Used by `cost`.
+traffic_profile:
+  cloud:   4200
+  cdn:     8800
+  ix_rs:   3100
+  ix_bilat: 2400
+  transit_only: 1900

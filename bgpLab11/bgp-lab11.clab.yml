@@ -1,0 +1,46 @@
+# bgp-lab11 | Capstone. Two VRFs, dual border, stretched L2, dual-homed WAN.
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+# Nothing here is new. Everything from labs 01 to 10 is present at once.
+# What is different is the fault model: these faults do not announce
+# themselves. There is no base mode. Deploy, verify, then ./lab.sh break
+name: bgp-lab11
+
+mgmt:
+  network: clab-bgp-lab11
+  ipv4-subnet: 172.31.111.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    leaf1:  {kind: arista_ceos, startup-config: configs/active/leaf1.cfg}
+    leaf2:  {kind: arista_ceos, startup-config: configs/active/leaf2.cfg}
+    leaf3:  {kind: arista_ceos, startup-config: configs/active/leaf3.cfg}
+    bleaf1: {kind: arista_ceos, startup-config: configs/active/bleaf1.cfg}
+    bleaf2: {kind: arista_ceos, startup-config: configs/active/bleaf2.cfg}
+    wan:    {kind: arista_ceos, startup-config: configs/active/wan.cfg}
+    h1:     {kind: arista_ceos, startup-config: configs/active/h1.cfg}
+    h2:     {kind: arista_ceos, startup-config: configs/active/h2.cfg}
+    h3:     {kind: arista_ceos, startup-config: configs/active/h3.cfg}
+
+  links:
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine1:eth3", "leaf3:eth1"]
+    - endpoints: ["spine1:eth4", "bleaf1:eth1"]
+    - endpoints: ["spine1:eth5", "bleaf2:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine2:eth3", "leaf3:eth2"]
+    - endpoints: ["spine2:eth4", "bleaf1:eth2"]
+    - endpoints: ["spine2:eth5", "bleaf2:eth2"]
+    - endpoints: ["bleaf1:eth3", "wan:eth1"]
+    - endpoints: ["bleaf2:eth3", "wan:eth2"]
+    - endpoints: ["leaf1:eth3", "h1:eth1"]
+    - endpoints: ["leaf2:eth3", "h2:eth1"]
+    - endpoints: ["leaf3:eth4", "h3:eth1"]

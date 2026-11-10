@@ -1,0 +1,179 @@
+# bgp-lab13 | Carriers, dark fibre, IX, cloud interconnect, long haul and subsea
+# containerlab 0.79.0 | cEOS 4.36.0.1F + one Linux bridge for the IX fabric
+#
+# AS 65010 "NORTHSTAR" runs Seattle (Westin), Tukwila and Ashburn, and buys
+# every kind of interconnect there is. The lab is about which one each packet
+# should use, whether the circuits you bought are actually diverse, and what
+# the wrong answer costs per month.
+#
+# Peer space is 100.64.0.0/10 (reserved, never globally routed) standing in
+# for real routable space. Our space is RFC 5737 documentation prefixes.
+# Every carrier, cable and facility name is fictional.
+#
+# MTU is deliberately not uniform: 9100 on our own backbone and the PNIs,
+# 1500 on every handoff (IX fabric, IP transit, cloud interconnect). That is
+# what the real world looks like and `verify` asserts it.
+name: bgp-lab13
+
+mgmt:
+  network: clab-bgp-lab13
+  ipv4-subnet: 172.31.113.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    sea1:      {kind: arista_ceos, startup-config: configs/active/sea1.cfg}
+    sea2:      {kind: arista_ceos, startup-config: configs/active/sea2.cfg}
+    ash1:      {kind: arista_ceos, startup-config: configs/active/ash1.cfg}
+    transit1:  {kind: arista_ceos, startup-config: configs/active/transit1.cfg}
+    transit2:  {kind: arista_ceos, startup-config: configs/active/transit2.cfg}
+    ixrs:      {kind: arista_ceos, startup-config: configs/active/ixrs.cfg}
+    ixpeer1:   {kind: arista_ceos, startup-config: configs/active/ixpeer1.cfg}
+    ixpeer2:   {kind: arista_ceos, startup-config: configs/active/ixpeer2.cfg}
+    cdn1:      {kind: arista_ceos, startup-config: configs/active/cdn1.cfg}
+    cloudgw:   {kind: arista_ceos, startup-config: configs/active/cloudgw.cfg}
+
+    # The IX peering fabric. An internet exchange is an L2 fabric, so that is
+    # what this is: a plain Linux bridge. It is also 1/20th the RAM of another
+    # cEOS node, which is why the lab fits on one machine.
+    ixfab:
+      kind: linux
+      image: wbitt/network-multitool:alpine-extra
+      exec:
+        - ip link add name ixbr type bridge
+        - ip link set ixbr up
+        - ip link set eth1 master ixbr
+        - ip link set eth2 master ixbr
+        - ip link set eth3 master ixbr
+        - ip link set eth4 master ixbr
+        - ip link set eth5 master ixbr
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip link set eth3 up
+        - ip link set eth4 up
+        - ip link set eth5 up
+
+  links:
+    # TRANSIT-1A, IP transit handoff at Westin
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth1
+        - node: transit1
+          interface: eth1
+      mtu: 1500
+    # TRANSIT-1B, the 'diverse' second handoff
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth1
+        - node: transit1
+          interface: eth2
+      mtu: 1500
+    # TRANSIT-2, transpacific over TRANSPAC-1
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth7
+        - node: transit2
+          interface: eth1
+      mtu: 1500
+    # IX-PORT-A
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth2
+        - node: ixfab
+          interface: eth4
+      mtu: 1500
+    # IX-PORT-B
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth2
+        - node: ixfab
+          interface: eth5
+      mtu: 1500
+    # route server on the peering LAN
+    - type: veth
+      endpoints:
+        - node: ixrs
+          interface: eth1
+        - node: ixfab
+          interface: eth1
+      mtu: 1500
+    # CASCADE, route-server only
+    - type: veth
+      endpoints:
+        - node: ixpeer1
+          interface: eth1
+        - node: ixfab
+          interface: eth2
+      mtu: 1500
+    # EVERGREEN, bilateral only
+    - type: veth
+      endpoints:
+        - node: ixpeer2
+          interface: eth1
+        - node: ixfab
+          interface: eth3
+      mtu: 1500
+    # PNI-CDN-A, cross connect
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth3
+        - node: cdn1
+          interface: eth1
+      mtu: 9100
+    # PNI-CDN-B, backhauled EPL
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth3
+        - node: cdn1
+          interface: eth2
+      mtu: 9100
+    # CLOUD-IC-A
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth4
+        - node: cloudgw
+          interface: eth1
+      mtu: 1500
+    # CLOUD-IC-B
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth4
+        - node: cloudgw
+          interface: eth2
+      mtu: 1500
+    # DF-SEA-001, our own dark fibre
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth5
+        - node: sea2
+          interface: eth5
+      mtu: 9100
+    # WAVE-SEA-ASH-A, 1+1 protected
+    - type: veth
+      endpoints:
+        - node: sea1
+          interface: eth6
+        - node: ash1
+          interface: eth1
+      mtu: 9100
+    # WAVE-SEA-ASH-B, unprotected
+    - type: veth
+      endpoints:
+        - node: sea2
+          interface: eth6
+        - node: ash1
+          interface: eth2
+      mtu: 9100

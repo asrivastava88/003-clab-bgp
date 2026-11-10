@@ -1,0 +1,128 @@
+# bgp-lab12 | Rail-optimized AI/HPC fabric. Pure routed Clos, BGP to the host.
+# containerlab 0.79.0 | cEOS 4.36.0.1F  (every node)
+#
+# No EVPN, no VXLAN, no VRFs, no overlay. Every server runs eBGP to both
+# rails and advertises its own endpoint. Two endpoints on the same rail
+# index talk in one hop and never touch a spine.
+#
+# This fabric is not sensitive to reachability. It is sensitive to WIDTH.
+name: bgp-lab12
+
+mgmt:
+  network: clab-bgp-lab12
+  ipv4-subnet: 172.31.112.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    spine1: {kind: arista_ceos, startup-config: configs/active/spine1.cfg}
+    spine2: {kind: arista_ceos, startup-config: configs/active/spine2.cfg}
+    rail1:  {kind: arista_ceos, startup-config: configs/active/rail1.cfg}
+    rail2:  {kind: arista_ceos, startup-config: configs/active/rail2.cfg}
+    stor1:  {kind: arista_ceos, startup-config: configs/active/stor1.cfg}
+    gpu1:   {kind: arista_ceos, startup-config: configs/active/gpu1.cfg}
+    gpu2:   {kind: arista_ceos, startup-config: configs/active/gpu2.cfg}
+    gpu3:   {kind: arista_ceos, startup-config: configs/active/gpu3.cfg}
+    nfs1:   {kind: arista_ceos, startup-config: configs/active/nfs1.cfg}
+
+  # Extended link format so every veth carries a 9214 MTU. Without this the
+  # kernel builds the veth at 1500 and the 8000-byte tests fail everywhere,
+  # regardless of what the EOS interfaces say.
+  links:
+    # spine to leaf
+    - type: veth
+      endpoints:
+        - node: spine1
+          interface: eth1
+        - node: rail1
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: spine1
+          interface: eth2
+        - node: rail2
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: spine1
+          interface: eth3
+        - node: stor1
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: spine2
+          interface: eth1
+        - node: rail1
+          interface: eth2
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: spine2
+          interface: eth2
+        - node: rail2
+          interface: eth2
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: spine2
+          interface: eth3
+        - node: stor1
+          interface: eth2
+      mtu: 9214
+    # every GPU server: NIC1 to rail1, NIC2 to rail2
+    - type: veth
+      endpoints:
+        - node: rail1
+          interface: eth3
+        - node: gpu1
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: rail1
+          interface: eth4
+        - node: gpu2
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: rail1
+          interface: eth5
+        - node: gpu3
+          interface: eth1
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: rail2
+          interface: eth3
+        - node: gpu1
+          interface: eth2
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: rail2
+          interface: eth4
+        - node: gpu2
+          interface: eth2
+      mtu: 9214
+    - type: veth
+      endpoints:
+        - node: rail2
+          interface: eth5
+        - node: gpu3
+          interface: eth2
+      mtu: 9214
+    # storage
+    - type: veth
+      endpoints:
+        - node: stor1
+          interface: eth3
+        - node: nfs1
+          interface: eth1
+      mtu: 9214

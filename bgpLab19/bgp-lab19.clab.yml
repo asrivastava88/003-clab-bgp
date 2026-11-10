@@ -1,0 +1,632 @@
+# bgp-lab19 | Multi-tenant EVPN across three regions. GENERATED.
+#   OSPF underlay, iBGP EVPN overlay reflected by the super-spines,
+#   three tenant VRFs on a hub-and-spoke route-target plan, and a
+#   per-VRF eBGP handoff to two carriers on dot1q sub-interfaces.
+name: bgp-lab19
+
+mgmt:
+  network: clab-bgp-lab19
+  ipv4-subnet: 172.31.119.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:4.36.0.1F
+
+  nodes:
+    wst-ss1:     {kind: arista_ceos, startup-config: configs/active/wst-ss1.cfg}   # superspine
+    wst-ss2:     {kind: arista_ceos, startup-config: configs/active/wst-ss2.cfg}   # superspine
+    wst-p1-s1:   {kind: arista_ceos, startup-config: configs/active/wst-p1-s1.cfg}   # spine
+    wst-p1-s2:   {kind: arista_ceos, startup-config: configs/active/wst-p1-s2.cfg}   # spine
+    wst-p1-l1:   {kind: arista_ceos, startup-config: configs/active/wst-p1-l1.cfg}   # leaf
+    wst-p1-l2:   {kind: arista_ceos, startup-config: configs/active/wst-p1-l2.cfg}   # leaf
+    wst-p2-s1:   {kind: arista_ceos, startup-config: configs/active/wst-p2-s1.cfg}   # spine
+    wst-p2-s2:   {kind: arista_ceos, startup-config: configs/active/wst-p2-s2.cfg}   # spine
+    wst-p2-l1:   {kind: arista_ceos, startup-config: configs/active/wst-p2-l1.cfg}   # leaf
+    wst-p2-l2:   {kind: arista_ceos, startup-config: configs/active/wst-p2-l2.cfg}   # leaf
+    wst-b1:      {kind: arista_ceos, startup-config: configs/active/wst-b1.cfg}   # border
+    wst-b2:      {kind: arista_ceos, startup-config: configs/active/wst-b2.cfg}   # border
+    est-ss1:     {kind: arista_ceos, startup-config: configs/active/est-ss1.cfg}   # superspine
+    est-ss2:     {kind: arista_ceos, startup-config: configs/active/est-ss2.cfg}   # superspine
+    est-p1-s1:   {kind: arista_ceos, startup-config: configs/active/est-p1-s1.cfg}   # spine
+    est-p1-s2:   {kind: arista_ceos, startup-config: configs/active/est-p1-s2.cfg}   # spine
+    est-p1-l1:   {kind: arista_ceos, startup-config: configs/active/est-p1-l1.cfg}   # leaf
+    est-p1-l2:   {kind: arista_ceos, startup-config: configs/active/est-p1-l2.cfg}   # leaf
+    est-p2-s1:   {kind: arista_ceos, startup-config: configs/active/est-p2-s1.cfg}   # spine
+    est-p2-s2:   {kind: arista_ceos, startup-config: configs/active/est-p2-s2.cfg}   # spine
+    est-p2-l1:   {kind: arista_ceos, startup-config: configs/active/est-p2-l1.cfg}   # leaf
+    est-p2-l2:   {kind: arista_ceos, startup-config: configs/active/est-p2-l2.cfg}   # leaf
+    est-b1:      {kind: arista_ceos, startup-config: configs/active/est-b1.cfg}   # border
+    est-b2:      {kind: arista_ceos, startup-config: configs/active/est-b2.cfg}   # border
+    eur-ss1:     {kind: arista_ceos, startup-config: configs/active/eur-ss1.cfg}   # superspine
+    eur-ss2:     {kind: arista_ceos, startup-config: configs/active/eur-ss2.cfg}   # superspine
+    eur-p1-s1:   {kind: arista_ceos, startup-config: configs/active/eur-p1-s1.cfg}   # spine
+    eur-p1-s2:   {kind: arista_ceos, startup-config: configs/active/eur-p1-s2.cfg}   # spine
+    eur-p1-l1:   {kind: arista_ceos, startup-config: configs/active/eur-p1-l1.cfg}   # leaf
+    eur-p1-l2:   {kind: arista_ceos, startup-config: configs/active/eur-p1-l2.cfg}   # leaf
+    eur-p2-s1:   {kind: arista_ceos, startup-config: configs/active/eur-p2-s1.cfg}   # spine
+    eur-p2-s2:   {kind: arista_ceos, startup-config: configs/active/eur-p2-s2.cfg}   # spine
+    eur-p2-l1:   {kind: arista_ceos, startup-config: configs/active/eur-p2-l1.cfg}   # leaf
+    eur-p2-l2:   {kind: arista_ceos, startup-config: configs/active/eur-p2-l2.cfg}   # leaf
+    eur-b1:      {kind: arista_ceos, startup-config: configs/active/eur-b1.cfg}   # border
+    eur-b2:      {kind: arista_ceos, startup-config: configs/active/eur-b2.cfg}   # border
+    wan1:        {kind: arista_ceos, startup-config: configs/active/wan1.cfg}   # carrier
+    wan2:        {kind: arista_ceos, startup-config: configs/active/wan2.cfg}   # carrier
+
+  links:
+    # link 1: wst-p1-s1 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-p1-s1
+          interface: eth3
+        - node: wst-ss1
+          interface: eth3
+      mtu: 9214
+    # link 2: wst-p1-s1 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-p1-s1
+          interface: eth4
+        - node: wst-ss2
+          interface: eth3
+      mtu: 9214
+    # link 3: wst-p1-s2 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-p1-s2
+          interface: eth3
+        - node: wst-ss1
+          interface: eth4
+      mtu: 9214
+    # link 4: wst-p1-s2 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-p1-s2
+          interface: eth4
+        - node: wst-ss2
+          interface: eth4
+      mtu: 9214
+    # link 5: wst-p1-l1 <-> wst-p1-s1
+    - type: veth
+      endpoints:
+        - node: wst-p1-l1
+          interface: eth1
+        - node: wst-p1-s1
+          interface: eth1
+      mtu: 9214
+    # link 6: wst-p1-l1 <-> wst-p1-s2
+    - type: veth
+      endpoints:
+        - node: wst-p1-l1
+          interface: eth2
+        - node: wst-p1-s2
+          interface: eth1
+      mtu: 9214
+    # link 7: wst-p1-l2 <-> wst-p1-s1
+    - type: veth
+      endpoints:
+        - node: wst-p1-l2
+          interface: eth1
+        - node: wst-p1-s1
+          interface: eth2
+      mtu: 9214
+    # link 8: wst-p1-l2 <-> wst-p1-s2
+    - type: veth
+      endpoints:
+        - node: wst-p1-l2
+          interface: eth2
+        - node: wst-p1-s2
+          interface: eth2
+      mtu: 9214
+    # link 9: wst-p2-s1 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-p2-s1
+          interface: eth3
+        - node: wst-ss1
+          interface: eth5
+      mtu: 9214
+    # link 10: wst-p2-s1 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-p2-s1
+          interface: eth4
+        - node: wst-ss2
+          interface: eth5
+      mtu: 9214
+    # link 11: wst-p2-s2 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-p2-s2
+          interface: eth3
+        - node: wst-ss1
+          interface: eth6
+      mtu: 9214
+    # link 12: wst-p2-s2 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-p2-s2
+          interface: eth4
+        - node: wst-ss2
+          interface: eth6
+      mtu: 9214
+    # link 13: wst-p2-l1 <-> wst-p2-s1
+    - type: veth
+      endpoints:
+        - node: wst-p2-l1
+          interface: eth1
+        - node: wst-p2-s1
+          interface: eth1
+      mtu: 9214
+    # link 14: wst-p2-l1 <-> wst-p2-s2
+    - type: veth
+      endpoints:
+        - node: wst-p2-l1
+          interface: eth2
+        - node: wst-p2-s2
+          interface: eth1
+      mtu: 9214
+    # link 15: wst-p2-l2 <-> wst-p2-s1
+    - type: veth
+      endpoints:
+        - node: wst-p2-l2
+          interface: eth1
+        - node: wst-p2-s1
+          interface: eth2
+      mtu: 9214
+    # link 16: wst-p2-l2 <-> wst-p2-s2
+    - type: veth
+      endpoints:
+        - node: wst-p2-l2
+          interface: eth2
+        - node: wst-p2-s2
+          interface: eth2
+      mtu: 9214
+    # link 17: wst-b1 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-b1
+          interface: eth3
+        - node: wst-ss1
+          interface: eth1
+      mtu: 9214
+    # link 18: wst-b1 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-b1
+          interface: eth4
+        - node: wst-ss2
+          interface: eth1
+      mtu: 9214
+    # link 19: wst-b2 <-> wst-ss1
+    - type: veth
+      endpoints:
+        - node: wst-b2
+          interface: eth3
+        - node: wst-ss1
+          interface: eth2
+      mtu: 9214
+    # link 20: wst-b2 <-> wst-ss2
+    - type: veth
+      endpoints:
+        - node: wst-b2
+          interface: eth4
+        - node: wst-ss2
+          interface: eth2
+      mtu: 9214
+    # link 21: est-p1-s1 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-p1-s1
+          interface: eth3
+        - node: est-ss1
+          interface: eth3
+      mtu: 9214
+    # link 22: est-p1-s1 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-p1-s1
+          interface: eth4
+        - node: est-ss2
+          interface: eth3
+      mtu: 9214
+    # link 23: est-p1-s2 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-p1-s2
+          interface: eth3
+        - node: est-ss1
+          interface: eth4
+      mtu: 9214
+    # link 24: est-p1-s2 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-p1-s2
+          interface: eth4
+        - node: est-ss2
+          interface: eth4
+      mtu: 9214
+    # link 25: est-p1-l1 <-> est-p1-s1
+    - type: veth
+      endpoints:
+        - node: est-p1-l1
+          interface: eth1
+        - node: est-p1-s1
+          interface: eth1
+      mtu: 9214
+    # link 26: est-p1-l1 <-> est-p1-s2
+    - type: veth
+      endpoints:
+        - node: est-p1-l1
+          interface: eth2
+        - node: est-p1-s2
+          interface: eth1
+      mtu: 9214
+    # link 27: est-p1-l2 <-> est-p1-s1
+    - type: veth
+      endpoints:
+        - node: est-p1-l2
+          interface: eth1
+        - node: est-p1-s1
+          interface: eth2
+      mtu: 9214
+    # link 28: est-p1-l2 <-> est-p1-s2
+    - type: veth
+      endpoints:
+        - node: est-p1-l2
+          interface: eth2
+        - node: est-p1-s2
+          interface: eth2
+      mtu: 9214
+    # link 29: est-p2-s1 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-p2-s1
+          interface: eth3
+        - node: est-ss1
+          interface: eth5
+      mtu: 9214
+    # link 30: est-p2-s1 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-p2-s1
+          interface: eth4
+        - node: est-ss2
+          interface: eth5
+      mtu: 9214
+    # link 31: est-p2-s2 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-p2-s2
+          interface: eth3
+        - node: est-ss1
+          interface: eth6
+      mtu: 9214
+    # link 32: est-p2-s2 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-p2-s2
+          interface: eth4
+        - node: est-ss2
+          interface: eth6
+      mtu: 9214
+    # link 33: est-p2-l1 <-> est-p2-s1
+    - type: veth
+      endpoints:
+        - node: est-p2-l1
+          interface: eth1
+        - node: est-p2-s1
+          interface: eth1
+      mtu: 9214
+    # link 34: est-p2-l1 <-> est-p2-s2
+    - type: veth
+      endpoints:
+        - node: est-p2-l1
+          interface: eth2
+        - node: est-p2-s2
+          interface: eth1
+      mtu: 9214
+    # link 35: est-p2-l2 <-> est-p2-s1
+    - type: veth
+      endpoints:
+        - node: est-p2-l2
+          interface: eth1
+        - node: est-p2-s1
+          interface: eth2
+      mtu: 9214
+    # link 36: est-p2-l2 <-> est-p2-s2
+    - type: veth
+      endpoints:
+        - node: est-p2-l2
+          interface: eth2
+        - node: est-p2-s2
+          interface: eth2
+      mtu: 9214
+    # link 37: est-b1 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-b1
+          interface: eth1
+        - node: est-ss1
+          interface: eth1
+      mtu: 9214
+    # link 38: est-b1 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-b1
+          interface: eth2
+        - node: est-ss2
+          interface: eth1
+      mtu: 9214
+    # link 39: est-b2 <-> est-ss1
+    - type: veth
+      endpoints:
+        - node: est-b2
+          interface: eth1
+        - node: est-ss1
+          interface: eth2
+      mtu: 9214
+    # link 40: est-b2 <-> est-ss2
+    - type: veth
+      endpoints:
+        - node: est-b2
+          interface: eth2
+        - node: est-ss2
+          interface: eth2
+      mtu: 9214
+    # link 41: eur-p1-s1 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-p1-s1
+          interface: eth3
+        - node: eur-ss1
+          interface: eth3
+      mtu: 9214
+    # link 42: eur-p1-s1 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-p1-s1
+          interface: eth4
+        - node: eur-ss2
+          interface: eth3
+      mtu: 9214
+    # link 43: eur-p1-s2 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-p1-s2
+          interface: eth3
+        - node: eur-ss1
+          interface: eth4
+      mtu: 9214
+    # link 44: eur-p1-s2 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-p1-s2
+          interface: eth4
+        - node: eur-ss2
+          interface: eth4
+      mtu: 9214
+    # link 45: eur-p1-l1 <-> eur-p1-s1
+    - type: veth
+      endpoints:
+        - node: eur-p1-l1
+          interface: eth1
+        - node: eur-p1-s1
+          interface: eth1
+      mtu: 9214
+    # link 46: eur-p1-l1 <-> eur-p1-s2
+    - type: veth
+      endpoints:
+        - node: eur-p1-l1
+          interface: eth2
+        - node: eur-p1-s2
+          interface: eth1
+      mtu: 9214
+    # link 47: eur-p1-l2 <-> eur-p1-s1
+    - type: veth
+      endpoints:
+        - node: eur-p1-l2
+          interface: eth1
+        - node: eur-p1-s1
+          interface: eth2
+      mtu: 9214
+    # link 48: eur-p1-l2 <-> eur-p1-s2
+    - type: veth
+      endpoints:
+        - node: eur-p1-l2
+          interface: eth2
+        - node: eur-p1-s2
+          interface: eth2
+      mtu: 9214
+    # link 49: eur-p2-s1 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-p2-s1
+          interface: eth3
+        - node: eur-ss1
+          interface: eth5
+      mtu: 9214
+    # link 50: eur-p2-s1 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-p2-s1
+          interface: eth4
+        - node: eur-ss2
+          interface: eth5
+      mtu: 9214
+    # link 51: eur-p2-s2 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-p2-s2
+          interface: eth3
+        - node: eur-ss1
+          interface: eth6
+      mtu: 9214
+    # link 52: eur-p2-s2 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-p2-s2
+          interface: eth4
+        - node: eur-ss2
+          interface: eth6
+      mtu: 9214
+    # link 53: eur-p2-l1 <-> eur-p2-s1
+    - type: veth
+      endpoints:
+        - node: eur-p2-l1
+          interface: eth1
+        - node: eur-p2-s1
+          interface: eth1
+      mtu: 9214
+    # link 54: eur-p2-l1 <-> eur-p2-s2
+    - type: veth
+      endpoints:
+        - node: eur-p2-l1
+          interface: eth2
+        - node: eur-p2-s2
+          interface: eth1
+      mtu: 9214
+    # link 55: eur-p2-l2 <-> eur-p2-s1
+    - type: veth
+      endpoints:
+        - node: eur-p2-l2
+          interface: eth1
+        - node: eur-p2-s1
+          interface: eth2
+      mtu: 9214
+    # link 56: eur-p2-l2 <-> eur-p2-s2
+    - type: veth
+      endpoints:
+        - node: eur-p2-l2
+          interface: eth2
+        - node: eur-p2-s2
+          interface: eth2
+      mtu: 9214
+    # link 57: eur-b1 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-b1
+          interface: eth1
+        - node: eur-ss1
+          interface: eth1
+      mtu: 9214
+    # link 58: eur-b1 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-b1
+          interface: eth2
+        - node: eur-ss2
+          interface: eth1
+      mtu: 9214
+    # link 59: eur-b2 <-> eur-ss1
+    - type: veth
+      endpoints:
+        - node: eur-b2
+          interface: eth1
+        - node: eur-ss1
+          interface: eth2
+      mtu: 9214
+    # link 60: eur-b2 <-> eur-ss2
+    - type: veth
+      endpoints:
+        - node: eur-b2
+          interface: eth2
+        - node: eur-ss2
+          interface: eth2
+      mtu: 9214
+    # link 61: wst-b1 <-> wan1
+    - type: veth
+      endpoints:
+        - node: wst-b1
+          interface: eth1
+        - node: wan1
+          interface: eth5
+      mtu: 9214
+    # link 62: wst-b1 <-> wan2
+    - type: veth
+      endpoints:
+        - node: wst-b1
+          interface: eth2
+        - node: wan2
+          interface: eth5
+      mtu: 9214
+    # link 63: wst-b2 <-> wan1
+    - type: veth
+      endpoints:
+        - node: wst-b2
+          interface: eth1
+        - node: wan1
+          interface: eth6
+      mtu: 9214
+    # link 64: wst-b2 <-> wan2
+    - type: veth
+      endpoints:
+        - node: wst-b2
+          interface: eth2
+        - node: wan2
+          interface: eth6
+      mtu: 9214
+    # link 65: est-b1 <-> wan1
+    - type: veth
+      endpoints:
+        - node: est-b1
+          interface: eth3
+        - node: wan1
+          interface: eth1
+      mtu: 9214
+    # link 66: est-b1 <-> wan2
+    - type: veth
+      endpoints:
+        - node: est-b1
+          interface: eth4
+        - node: wan2
+          interface: eth1
+      mtu: 9214
+    # link 67: est-b2 <-> wan1
+    - type: veth
+      endpoints:
+        - node: est-b2
+          interface: eth3
+        - node: wan1
+          interface: eth2
+      mtu: 9214
+    # link 68: est-b2 <-> wan2
+    - type: veth
+      endpoints:
+        - node: est-b2
+          interface: eth4
+        - node: wan2
+          interface: eth2
+      mtu: 9214
+    # link 69: eur-b1 <-> wan1
+    - type: veth
+      endpoints:
+        - node: eur-b1
+          interface: eth3
+        - node: wan1
+          interface: eth3
+      mtu: 9214
+    # link 70: eur-b1 <-> wan2
+    - type: veth
+      endpoints:
+        - node: eur-b1
+          interface: eth4
+        - node: wan2
+          interface: eth3
+      mtu: 9214
+    # link 71: eur-b2 <-> wan1
+    - type: veth
+      endpoints:
+        - node: eur-b2
+          interface: eth3
+        - node: wan1
+          interface: eth4
+      mtu: 9214
+    # link 72: eur-b2 <-> wan2
+    - type: veth
+      endpoints:
+        - node: eur-b2
+          interface: eth4
+        - node: wan2
+          interface: eth4
+      mtu: 9214
